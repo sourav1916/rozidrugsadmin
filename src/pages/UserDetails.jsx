@@ -31,6 +31,10 @@ const UserDetails = () => {
   const [editLoading, setEditLoading] = useState(false);
   const [editError, setEditError] = useState("");
 
+  const [showChangeStatusModal, setShowChangeStatusModal] = useState(false);
+  const [statusLoading, setStatusLoading] = useState(false);
+  const [statusError, setStatusError] = useState("");
+
   const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
   const [passwordForm, setPasswordForm] = useState({
     password: "",
@@ -101,6 +105,17 @@ const UserDetails = () => {
         </div>
 
         <div className="d-flex align-items-center gap-2">
+          <button
+            type="button"
+            className="btn btn-outline-secondary d-flex align-items-center gap-2"
+            onClick={() => {
+              setStatusError("");
+              setShowChangeStatusModal(true);
+            }}
+            disabled={loading || !details}
+          >
+            Change Status
+          </button>
           <button
             type="button"
             className="btn btn-outline-primary d-flex align-items-center gap-2"
@@ -185,11 +200,17 @@ const UserDetails = () => {
 
                   <div className="col-12 col-md-6">
                     <div className="text-muted small">Account Status</div>
-                    <span
-                      className={`badge ${details.status ? "text-bg-success" : "text-bg-danger"}`}
+                    <button
+                      type="button"
+                      className={`badge border-0 ${details.status ? "text-bg-success" : "text-bg-danger"}`}
+                      style={{ cursor: "pointer" }}
+                      onClick={() => {
+                        setStatusError("");
+                        setShowChangeStatusModal(true);
+                      }}
                     >
                       {details.status ? "Active" : "Inactive"}
-                    </span>
+                    </button>
                   </div>
                 </div>
               )}
@@ -481,6 +502,10 @@ const UserDetails = () => {
                 </div>
 
                 <div className="card-body">
+                  <div className="text-muted small mb-3">
+                    User: <strong>{details?.name || username || "-"}</strong>
+                  </div>
+
                   {passwordSuccess && (
                     <div className="alert alert-success" role="alert">
                       {passwordSuccess}
@@ -509,6 +534,32 @@ const UserDetails = () => {
                           }
                           placeholder="Minimum 8 characters"
                         />
+                        <button
+                          type="button"
+                          className="btn btn-outline-primary d-flex align-items-center gap-2"
+                          onClick={() => {
+                            const upper = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+                            const lower = "abcdefghjkmnpqrstuvwxyz";
+                            const digits = "23456789";
+                            const special = "!@#$%&*";
+                            const all = upper + lower + digits + special;
+                            let pwd =
+                              upper[Math.floor(Math.random() * upper.length)] +
+                              lower[Math.floor(Math.random() * lower.length)] +
+                              digits[Math.floor(Math.random() * digits.length)] +
+                              special[Math.floor(Math.random() * special.length)];
+                            for (let i = 0; i < 4; i++) {
+                              pwd += all[Math.floor(Math.random() * all.length)];
+                            }
+                            pwd = pwd.split("").sort(() => Math.random() - 0.5).join("");
+                            setPasswordForm({
+                              password: pwd,
+                              confirmPassword: pwd,
+                            });
+                          }}
+                        >
+                          Generate
+                        </button>
                         <button
                           type="button"
                           className="btn btn-outline-secondary d-flex align-items-center gap-2"
@@ -633,6 +684,130 @@ const UserDetails = () => {
                   >
                     {passwordLoading ? "Saving..." : "Save"}
                   </button>
+                </div>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showChangeStatusModal && details && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.15 }}
+              className="position-fixed top-0 start-0 w-100 h-100"
+              style={{ background: "rgba(0,0,0,0.4)", zIndex: 1050 }}
+              onClick={() => (statusLoading ? null : setShowChangeStatusModal(false))}
+            />
+
+            <motion.div
+              initial={{ opacity: 0, y: 16, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 16, scale: 0.98 }}
+              transition={{ duration: 0.18, ease: "easeOut" }}
+              className="position-fixed top-50 start-50 translate-middle"
+              style={{ width: "min(400px, calc(100% - 24px))", zIndex: 1060 }}
+              role="dialog"
+              aria-modal="true"
+            >
+              <div className="card shadow">
+                <div className="card-header bg-white d-flex align-items-center justify-content-between">
+                  <div className="fw-semibold">Change Status</div>
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-outline-secondary"
+                    onClick={() => (statusLoading ? null : setShowChangeStatusModal(false))}
+                    aria-label="Close"
+                  >
+                    <FiX />
+                  </button>
+                </div>
+
+                <div className="card-body">
+                  <div className="text-muted small mb-3">
+                    User: <strong>{details?.name || username || "-"}</strong>
+                  </div>
+                  <div className="text-muted small mb-3">
+                    Current status:{" "}
+                    <span
+                      className={`badge ${details.status ? "text-bg-success" : "text-bg-danger"}`}
+                    >
+                      {details.status ? "Active" : "Inactive"}
+                    </span>
+                  </div>
+
+                  {statusError && (
+                    <div className="alert alert-danger" role="alert">
+                      {statusError}
+                    </div>
+                  )}
+
+                  <div className="d-flex gap-2">
+                    <button
+                      type="button"
+                      className="btn btn-success flex-grow-1"
+                      disabled={statusLoading || details.status}
+                      onClick={async () => {
+                        try {
+                          setStatusLoading(true);
+                          setStatusError("");
+                          const res = await axios.post(
+                            `${BASE_API_URL}/users/change-status`,
+                            { username, status: "active" },
+                            { headers: { token } },
+                          );
+                          if (res?.data?.error) {
+                            setStatusError(res?.data?.msg || "Failed to update status");
+                            return;
+                          }
+                          setShowChangeStatusModal(false);
+                          setRefreshKey((k) => k + 1);
+                        } catch (e) {
+                          setStatusError(
+                            e?.response?.data?.msg || e?.message || "Failed to update status",
+                          );
+                        } finally {
+                          setStatusLoading(false);
+                        }
+                      }}
+                    >
+                      {statusLoading ? "..." : "Set Active"}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-danger flex-grow-1"
+                      disabled={statusLoading || !details.status}
+                      onClick={async () => {
+                        try {
+                          setStatusLoading(true);
+                          setStatusError("");
+                          const res = await axios.post(
+                            `${BASE_API_URL}/users/change-status`,
+                            { username, status: "deactive" },
+                            { headers: { token } },
+                          );
+                          if (res?.data?.error) {
+                            setStatusError(res?.data?.msg || "Failed to update status");
+                            return;
+                          }
+                          setShowChangeStatusModal(false);
+                          setRefreshKey((k) => k + 1);
+                        } catch (e) {
+                          setStatusError(
+                            e?.response?.data?.msg || e?.message || "Failed to update status",
+                          );
+                        } finally {
+                          setStatusLoading(false);
+                        }
+                      }}
+                    >
+                      {statusLoading ? "..." : "Set Inactive"}
+                    </button>
+                  </div>
                 </div>
               </div>
             </motion.div>

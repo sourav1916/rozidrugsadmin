@@ -12,6 +12,8 @@ import Users from "./pages/Users";
 import Orders from "./pages/Orders";
 import Products from "./pages/Products";
 import Settings from "./pages/Settings";
+import Tags from "./pages/Tags";
+import Categories from "./pages/Categories";
 import Login from "./pages/Login";
 import Profile from "./pages/Profile";
 import UserDetails from "./pages/UserDetails";
@@ -55,6 +57,8 @@ function App() {
             <Route path="/user/:username" element={<UserDetails />} />
             <Route path="/orders" element={<Orders />} />
             <Route path="/products" element={<Products />} />
+            <Route path="/tags" element={<Tags />} />
+            <Route path="/categories" element={<Categories />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/profile" element={<Profile />} />
           </Route>

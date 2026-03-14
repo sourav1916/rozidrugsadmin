@@ -1,11 +1,16 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import {
   FiUsers,
-  FiPlus,
   FiSearch,
   FiChevronsLeft,
   FiChevronLeft,
@@ -18,6 +23,7 @@ import {
   FiCopy,
   FiX,
 } from "react-icons/fi";
+import { GoGear } from "react-icons/go";
 import { BASE_API_URL } from "../utils/config";
 
 const Users = () => {
@@ -27,17 +33,6 @@ const Users = () => {
   const [limit] = useState(10);
 
   const [refreshKey, setRefreshKey] = useState(0);
-
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [addForm, setAddForm] = useState({
-    name: "",
-    mobile: "",
-    email: "",
-    customer_id: "",
-  });
-  const [addLoading, setAddLoading] = useState(false);
-  const [addError, setAddError] = useState("");
-  const [createdUser, setCreatedUser] = useState(null);
 
   const [showEditModal, setShowEditModal] = useState(false);
   const [editForm, setEditForm] = useState({
@@ -53,13 +48,22 @@ const Users = () => {
   const [openActionMenu, setOpenActionMenu] = useState(null);
   const [actionMenuPos, setActionMenuPos] = useState(null);
   const actionMenuRef = useRef(null);
+  const triggerElRef = useRef(null);
   const [actionMenuSize, setActionMenuSize] = useState({
     width: 220,
     height: 0,
   });
 
+  const [showChangeStatusModal, setShowChangeStatusModal] = useState(false);
+  const [statusTargetUsername, setStatusTargetUsername] = useState("");
+  const [statusTargetName, setStatusTargetName] = useState("");
+  const [statusTargetCurrent, setStatusTargetCurrent] = useState(true);
+  const [statusLoading, setStatusLoading] = useState(false);
+  const [statusError, setStatusError] = useState("");
+
   const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
   const [passwordTargetUsername, setPasswordTargetUsername] = useState("");
+  const [passwordTargetName, setPasswordTargetName] = useState("");
   const [passwordForm, setPasswordForm] = useState({
     password: "",
     confirmPassword: "",
@@ -162,6 +166,7 @@ const Users = () => {
       if (el.closest("[data-users-action-menu-root]")) return;
       if (el.closest("[data-users-action-menu-portal]")) return;
       setOpenActionMenu(null);
+      triggerElRef.current = null;
       setActionMenuPos(null);
     };
 
@@ -173,13 +178,10 @@ const Users = () => {
     };
   }, []);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const handleReposition = () => {
-      if (!openActionMenu) return;
-      const trigger = document.querySelector(
-        `[data-users-action-menu-trigger="${CSS.escape(String(openActionMenu))}"]`,
-      );
-      if (!(trigger instanceof HTMLElement)) return;
+      const trigger = triggerElRef.current;
+      if (!trigger || !openActionMenu) return;
       const rect = trigger.getBoundingClientRect();
 
       const menuWidth = actionMenuSize.width || 220;
@@ -237,18 +239,6 @@ const Users = () => {
         <h1 className="h3 mb-0 d-flex align-items-center gap-2">
           <FiUsers /> Users Management
         </h1>
-        <button
-          type="button"
-          className="btn btn-primary d-flex align-items-center gap-2"
-          onClick={() => {
-            setAddError("");
-            setAddForm({ name: "", mobile: "", email: "", customer_id: "" });
-            setCreatedUser(null);
-            setShowAddModal(true);
-          }}
-        >
-          <FiPlus /> Add User
-        </button>
       </div>
 
       <div className="card shadow-sm">
@@ -325,11 +315,22 @@ const Users = () => {
                         {Number(user.balance || 0).toLocaleString()}
                       </td>
                       <td>
-                        <span
-                          className={`badge ${user.status ? "text-bg-success" : "text-bg-danger"}`}
+                        <button
+                          type="button"
+                          className={`badge border-0 ${user.status ? "text-bg-success" : "text-bg-danger"}`}
+                          style={{ cursor: "pointer" }}
+                          onClick={() => {
+                            setStatusError("");
+                            setStatusTargetUsername(user.username || "");
+                            setStatusTargetName(
+                              user.name || user.username || "-",
+                            );
+                            setStatusTargetCurrent(Boolean(user.status));
+                            setShowChangeStatusModal(true);
+                          }}
                         >
                           {user.status ? "Active" : "Inactive"}
-                        </span>
+                        </button>
                       </td>
                       <td className="text-end">
                         <div
@@ -343,14 +344,19 @@ const Users = () => {
                             data-users-action-menu-trigger={String(
                               user.username || user.email || user.mobile,
                             )}
-                            onClick={() =>
-                              setOpenActionMenu((v) =>
-                                v ===
-                                (user.username || user.email || user.mobile)
-                                  ? null
-                                  : user.username || user.email || user.mobile,
-                              )
-                            }
+                            onClick={(e) => {
+                              const id =
+                                user.username || user.email || user.mobile;
+                              const isClosing = openActionMenu === id;
+                              if (isClosing) {
+                                setOpenActionMenu(null);
+                                triggerElRef.current = null;
+                                setActionMenuPos(null);
+                              } else {
+                                triggerElRef.current = e.currentTarget;
+                                setOpenActionMenu(id);
+                              }
+                            }}
                           >
                             <FiMoreVertical />
                           </button>
@@ -390,6 +396,7 @@ const Users = () => {
                             openActionMenu,
                         );
                         setOpenActionMenu(null);
+                        triggerElRef.current = null;
                         setActionMenuPos(null);
 
                         if (!target?.username) return;
@@ -409,6 +416,7 @@ const Users = () => {
                             openActionMenu,
                         );
                         setOpenActionMenu(null);
+                        triggerElRef.current = null;
                         setActionMenuPos(null);
 
                         if (!target) return;
@@ -436,12 +444,42 @@ const Users = () => {
                             openActionMenu,
                         );
                         setOpenActionMenu(null);
+                        triggerElRef.current = null;
+                        setActionMenuPos(null);
+
+                        if (!target?.username) return;
+                        setStatusError("");
+                        setStatusTargetUsername(target.username);
+                        setStatusTargetName(
+                          target.name || target.username || "-",
+                        );
+                        setStatusTargetCurrent(Boolean(target.status));
+                        setShowChangeStatusModal(true);
+                      }}
+                    >
+                      <GoGear />
+                      Change Status
+                    </button>
+                    <button
+                      type="button"
+                      className="list-group-item list-group-item-action d-flex align-items-center gap-2"
+                      onClick={() => {
+                        const target = users.find(
+                          (u) =>
+                            (u.username || u.email || u.mobile) ===
+                            openActionMenu,
+                        );
+                        setOpenActionMenu(null);
+                        triggerElRef.current = null;
                         setActionMenuPos(null);
 
                         if (!target?.username) return;
                         setPasswordError("");
                         setPasswordSuccess("");
                         setPasswordTargetUsername(target.username);
+                        setPasswordTargetName(
+                          target.name || target.username || "-",
+                        );
                         setPasswordForm({ password: "", confirmPassword: "" });
                         setShowChangePasswordModal(true);
                       }}
@@ -534,198 +572,6 @@ const Users = () => {
           </div>
         </div>
       </div>
-
-      <AnimatePresence>
-        {showAddModal && (
-          <>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.15 }}
-              className="position-fixed top-0 start-0 w-100 h-100"
-              style={{ background: "rgba(0,0,0,0.4)", zIndex: 1050 }}
-              onClick={() => (addLoading ? null : setShowAddModal(false))}
-            />
-
-            <motion.div
-              initial={{ opacity: 0, y: 16, scale: 0.98 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 16, scale: 0.98 }}
-              transition={{ duration: 0.18, ease: "easeOut" }}
-              className="position-fixed top-50 start-50 translate-middle"
-              style={{ width: "min(560px, calc(100% - 24px))", zIndex: 1060 }}
-              role="dialog"
-              aria-modal="true"
-            >
-              <div className="card shadow">
-                <div className="card-header bg-white d-flex align-items-center justify-content-between">
-                  <div className="fw-semibold">Add User</div>
-                  <button
-                    type="button"
-                    className="btn btn-sm btn-outline-secondary"
-                    onClick={() => (addLoading ? null : setShowAddModal(false))}
-                    aria-label="Close"
-                  >
-                    <FiX />
-                  </button>
-                </div>
-
-                <div className="card-body">
-                  {addError && (
-                    <div className="alert alert-danger" role="alert">
-                      {addError}
-                    </div>
-                  )}
-
-                  {createdUser && (
-                    <div className="alert alert-success" role="alert">
-                      <div className="fw-semibold mb-1">
-                        User created successfully
-                      </div>
-                      <div className="small">
-                        Username: <strong>{createdUser.username}</strong>
-                      </div>
-                      <div className="small">
-                        Password: <strong>{createdUser.password}</strong>
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="row g-3">
-                    <div className="col-12">
-                      <label className="form-label">Name</label>
-                      <input
-                        type="text"
-                        className="form-control"
-                        value={addForm.name}
-                        onChange={(e) =>
-                          setAddForm((p) => ({ ...p, name: e.target.value }))
-                        }
-                        placeholder="Enter name"
-                        disabled={addLoading || Boolean(createdUser)}
-                      />
-                    </div>
-
-                    <div className="col-12 col-md-6">
-                      <label className="form-label">Mobile</label>
-                      <input
-                        type="text"
-                        className="form-control"
-                        value={addForm.mobile}
-                        onChange={(e) =>
-                          setAddForm((p) => ({ ...p, mobile: e.target.value }))
-                        }
-                        placeholder="03XXXXXXXXX"
-                        disabled={addLoading || Boolean(createdUser)}
-                      />
-                    </div>
-
-                    <div className="col-12 col-md-6">
-                      <label className="form-label">Email</label>
-                      <input
-                        type="email"
-                        className="form-control"
-                        value={addForm.email}
-                        onChange={(e) =>
-                          setAddForm((p) => ({ ...p, email: e.target.value }))
-                        }
-                        placeholder="user@example.com"
-                        disabled={addLoading || Boolean(createdUser)}
-                      />
-                    </div>
-
-                    <div className="col-12">
-                      <label className="form-label">Customer ID</label>
-                      <input
-                        type="text"
-                        className="form-control"
-                        value={addForm.customer_id}
-                        onChange={(e) =>
-                          setAddForm((p) => ({
-                            ...p,
-                            customer_id: e.target.value,
-                          }))
-                        }
-                        placeholder="Enter customer id"
-                        disabled={addLoading || Boolean(createdUser)}
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="card-footer bg-white d-flex justify-content-end gap-2">
-                  <button
-                    type="button"
-                    className="btn btn-outline-secondary"
-                    onClick={() => (addLoading ? null : setShowAddModal(false))}
-                    disabled={addLoading}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-primary"
-                    disabled={addLoading}
-                    onClick={async () => {
-                      try {
-                        setAddLoading(true);
-                        setAddError("");
-
-                        if (createdUser) {
-                          setShowAddModal(false);
-                          return;
-                        }
-
-                        const name = (addForm.name || "").toString().trim();
-                        const mobile = (addForm.mobile || "").toString().trim();
-                        const email = (addForm.email || "").toString().trim();
-                        const customerId = (addForm.customer_id || "")
-                          .toString()
-                          .trim();
-
-                        if (!name || !mobile || !email || !customerId) {
-                          setAddError("All fields are required");
-                          return;
-                        }
-
-                        const res = await axios.post(
-                          `${BASE_API_URL}/users/create`,
-                          {
-                            name,
-                            email,
-                            mobile,
-                            customer_id: customerId,
-                          },
-                          {
-                            headers: {
-                              token,
-                            },
-                          },
-                        );
-
-                        if (res?.data?.error) {
-                          setAddError(
-                            res?.data?.msg || "Failed to create user",
-                          );
-                          return;
-                        }
-
-                        setCreatedUser(res?.data?.data || null);
-                        setRefreshKey((k) => k + 1);
-                      } finally {
-                        setAddLoading(false);
-                      }
-                    }}
-                  >
-                    {createdUser ? "Done" : addLoading ? "Saving..." : "Save"}
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
 
       <AnimatePresence>
         {showEditModal && (
@@ -829,6 +675,7 @@ const Users = () => {
                         }
                         placeholder="Enter customer id"
                         disabled={editLoading}
+                        readOnly={true}
                       />
                     </div>
                   </div>
@@ -924,6 +771,148 @@ const Users = () => {
       </AnimatePresence>
 
       <AnimatePresence>
+        {showChangeStatusModal && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.15 }}
+              className="position-fixed top-0 start-0 w-100 h-100"
+              style={{ background: "rgba(0,0,0,0.4)", zIndex: 1050 }}
+              onClick={() =>
+                statusLoading ? null : setShowChangeStatusModal(false)
+              }
+            />
+
+            <motion.div
+              initial={{ opacity: 0, y: 16, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 16, scale: 0.98 }}
+              transition={{ duration: 0.18, ease: "easeOut" }}
+              className="position-fixed top-50 start-50 translate-middle"
+              style={{ width: "min(400px, calc(100% - 24px))", zIndex: 1060 }}
+              role="dialog"
+              aria-modal="true"
+            >
+              <div className="card shadow">
+                <div className="card-header bg-white d-flex align-items-center justify-content-between">
+                  <div className="fw-semibold">Change Status</div>
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-outline-secondary"
+                    onClick={() =>
+                      statusLoading ? null : setShowChangeStatusModal(false)
+                    }
+                    aria-label="Close"
+                  >
+                    <FiX />
+                  </button>
+                </div>
+
+                <div className="card-body">
+                  <div className="text-muted small mb-3">
+                    User: <strong>{statusTargetName || "-"}</strong>
+                  </div>
+                  <div className="text-muted small mb-3">
+                    Current status:{" "}
+                    <span
+                      className={`badge ${statusTargetCurrent ? "text-bg-success" : "text-bg-danger"}`}
+                    >
+                      {statusTargetCurrent ? "Active" : "Inactive"}
+                    </span>
+                  </div>
+
+                  {statusError && (
+                    <div className="alert alert-danger" role="alert">
+                      {statusError}
+                    </div>
+                  )}
+
+                  <div className="d-flex gap-2">
+                    <button
+                      type="button"
+                      className="btn btn-success flex-grow-1"
+                      disabled={statusLoading || statusTargetCurrent}
+                      onClick={async () => {
+                        try {
+                          setStatusLoading(true);
+                          setStatusError("");
+                          const res = await axios.post(
+                            `${BASE_API_URL}/users/change-status`,
+                            {
+                              username: statusTargetUsername,
+                              status: "active",
+                            },
+                            { headers: { token } },
+                          );
+                          if (res?.data?.error) {
+                            setStatusError(
+                              res?.data?.msg || "Failed to update status",
+                            );
+                            return;
+                          }
+                          setShowChangeStatusModal(false);
+                          setRefreshKey((k) => k + 1);
+                        } catch (e) {
+                          setStatusError(
+                            e?.response?.data?.msg ||
+                              e?.message ||
+                              "Failed to update status",
+                          );
+                        } finally {
+                          setStatusLoading(false);
+                        }
+                      }}
+                    >
+                      {statusLoading ? "..." : "Set Active"}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-danger flex-grow-1"
+                      disabled={statusLoading || !statusTargetCurrent}
+                      onClick={async () => {
+                        try {
+                          setStatusLoading(true);
+                          setStatusError("");
+                          const res = await axios.post(
+                            `${BASE_API_URL}/users/change-status`,
+                            {
+                              username: statusTargetUsername,
+                              status: "deactive",
+                            },
+                            { headers: { token } },
+                          );
+                          if (res?.data?.error) {
+                            setStatusError(
+                              res?.data?.msg || "Failed to update status",
+                            );
+                            return;
+                          }
+                          setShowChangeStatusModal(false);
+                          setRefreshKey((k) => k + 1);
+                        } catch (e) {
+                          setStatusError(
+                            e?.response?.data?.msg ||
+                              e?.message ||
+                              "Failed to update status",
+                          );
+                        } finally {
+                          setStatusLoading(false);
+                        }
+                      }}
+                    >
+                      {statusLoading ? "..." : "Set Inactive"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
         {showChangePasswordModal && (
           <>
             <motion.div
@@ -961,7 +950,7 @@ const Users = () => {
 
                 <div className="card-body">
                   <div className="text-muted small mb-3">
-                    Username: <strong>{passwordTargetUsername || "-"}</strong>
+                    User: <strong>{passwordTargetName || "-"}</strong>
                   </div>
 
                   {passwordError && (
@@ -992,6 +981,41 @@ const Users = () => {
                           }
                           placeholder="Minimum 8 characters"
                         />
+                        <button
+                          type="button"
+                          className="btn btn-outline-primary d-flex align-items-center gap-2"
+                          onClick={() => {
+                            const upper = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+                            const lower = "abcdefghjkmnpqrstuvwxyz";
+                            const digits = "23456789";
+                            const special = "!@#$%&*";
+                            const all = upper + lower + digits + special;
+                            let pwd =
+                              upper[Math.floor(Math.random() * upper.length)] +
+                              lower[Math.floor(Math.random() * lower.length)] +
+                              digits[
+                                Math.floor(Math.random() * digits.length)
+                              ] +
+                              special[
+                                Math.floor(Math.random() * special.length)
+                              ];
+                            for (let i = 0; i < 4; i++) {
+                              pwd +=
+                                all[Math.floor(Math.random() * all.length)];
+                            }
+                            pwd = pwd
+                              .split("")
+                              .sort(() => Math.random() - 0.5)
+                              .join("");
+                            setPasswordForm((prev) => ({
+                              ...prev,
+                              password: pwd,
+                              confirmPassword: pwd,
+                            }));
+                          }}
+                        >
+                          Generate
+                        </button>
                         <button
                           type="button"
                           className="btn btn-outline-secondary d-flex align-items-center gap-2"
